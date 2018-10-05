@@ -1,13 +1,13 @@
 package org.jetbrains.plugins.scala.worksheet.ui
 
 import com.intellij.openapi.command.CommandProcessor
-import com.intellij.openapi.editor.{Document, Editor, VisualPosition}
 import com.intellij.openapi.editor.impl.FoldingModelImpl
+import com.intellij.openapi.editor.{Document, Editor, VisualPosition}
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.psi.PsiDocumentManager
 import org.jetbrains.plugins.scala.extensions
-import org.jetbrains.plugins.scala.lang.psi.api.ScalaFile
+import org.jetbrains.plugins.scala.extensions.{invokeLater, startCommand}
 import org.jetbrains.plugins.scala.settings.ScalaProjectSettings
 import org.jetbrains.plugins.scala.worksheet.ui.WorksheetDiffSplitters.SimpleWorksheetSplitter
 
@@ -18,7 +18,7 @@ import org.jetbrains.plugins.scala.worksheet.ui.WorksheetDiffSplitters.SimpleWor
 abstract class WorksheetEditorPrinterBase(protected val originalEditor: Editor, 
                                           protected val worksheetViewer: Editor) extends WorksheetEditorPrinter {
   protected val viewerFolding: FoldingModelImpl = worksheetViewer.getFoldingModel.asInstanceOf[FoldingModelImpl]
-  protected val project: Project = originalEditor.getProject
+  protected implicit val project: Project = originalEditor.getProject
   protected val originalDocument: Document = originalEditor.getDocument
   protected val viewerDocument: Document = worksheetViewer.getDocument
   
@@ -29,7 +29,7 @@ abstract class WorksheetEditorPrinterBase(protected val originalEditor: Editor,
   def getViewerEditor: Editor = worksheetViewer
 
   override def internalError(errorMessage: String) {
-    extensions.invokeLater {
+    invokeLater {
       extensions.inWriteAction {
         simpleUpdate("Internal error: " + errorMessage, viewerDocument)
       }
@@ -50,15 +50,13 @@ abstract class WorksheetEditorPrinterBase(protected val originalEditor: Editor,
     WorksheetEditorPrinterFactory.saveWorksheetEvaluation(getScalaFile, result, getWorksheetViewersRation)
     redrawViewerDiffs()
   }
-  
-  protected def cleanFoldings() {
-    extensions.invokeLater {
-      viewerFolding runBatchFoldingOperation new Runnable {
-        override def run() {
-          viewerFolding.clearFoldRegions()
-        }
-      }
-      
+
+  protected def cleanFoldings(): Unit = {
+    invokeLater {
+      viewerFolding.runBatchFoldingOperation(() => {
+        viewerFolding.clearFoldRegions()
+      })
+
       worksheetViewer.getCaretModel.moveToVisualPosition(new VisualPosition(0, 0))
     }
   }
@@ -67,27 +65,26 @@ abstract class WorksheetEditorPrinterBase(protected val originalEditor: Editor,
     * 
     * @param foldings : (Start output, End output, Input lines count, End input)*
     */
-  protected def updateFoldings(foldings: Seq[(Int, Int, Int, Int)]) {
-    CommandProcessor.getInstance().executeCommand(project, new Runnable {
-      override def run() {
-        val isExpanded = !ScalaProjectSettings.getInstance(project).isWorksheetFoldCollapsedByDefault
-        
-        viewerFolding runBatchFoldingOperation(new Runnable {
-          override def run() {
-            foldings foreach {
-              case (start, end, limit, originalEnd) =>
-                val offset = originalDocument getLineEndOffset java.lang.Math.min(originalEnd, originalDocument.getLineCount)
-                val linesCount = viewerDocument.getLineNumber(end) - start - limit + 1
-                
-                group.addRegion(viewerFolding, viewerDocument.getLineStartOffset(start + limit - 1), end,
-                  offset, linesCount, limit, isExpanded)
-            }
+  protected def updateFoldings(foldings: Seq[(Int, Int, Int, Int)]): Unit = {
+    val runnable: Runnable = () => {
+      val isExpanded = !ScalaProjectSettings.getInstance(project).isWorksheetFoldCollapsedByDefault
 
-            WorksheetFoldGroup.save(getScalaFile, group)
-          }
-        }, false)
-      }
-    }, null, null)
+      viewerFolding.runBatchFoldingOperation(() => {
+        foldings foreach {
+          case (start, end, limit, originalEnd) =>
+            val offset = originalDocument getLineEndOffset java.lang.Math.min(originalEnd, originalDocument.getLineCount)
+            val linesCount = viewerDocument.getLineNumber(end) - start - limit + 1
+
+            group.addRegion(viewerFolding, viewerDocument.getLineStartOffset(start + limit - 1), end,
+              offset, linesCount, limit, isExpanded)
+        }
+
+        WorksheetFoldGroup.save(getScalaFile, group)
+      }, false)
+    }
+
+    startCommand(project, runnable, null)
+    CommandProcessor.getInstance().executeCommand(project, runnable, null, null)
   }
   
   protected def isInited: Boolean = inited
@@ -108,7 +105,7 @@ abstract class WorksheetEditorPrinterBase(protected val originalEditor: Editor,
   
   protected def commitDocument(doc: Document) {
     if (project.isDisposed) return //EA-70786
-    PsiDocumentManager getInstance project commitDocument doc
+    PsiDocumentManager.getInstance(project).commitDocument(doc)
   }
   
   protected def simpleUpdate(text: String, document: Document) {

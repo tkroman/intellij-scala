@@ -3,7 +3,6 @@ package org.jetbrains.plugins.scala.worksheet.ui
 import java.util.regex.Pattern
 
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
-import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.{Editor, LogicalPosition}
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.util.TextRange
@@ -11,6 +10,7 @@ import com.intellij.openapi.util.text.StringUtil
 import com.intellij.psi._
 import org.jetbrains.plugins.scala.extensions
 import org.jetbrains.plugins.scala.extensions.implementation.iterator.PrevSiblignsIterator
+import org.jetbrains.plugins.scala.extensions.{inWriteCommandAction, invokeLater}
 import org.jetbrains.plugins.scala.lang.psi.api.ScalaFile
 import org.jetbrains.plugins.scala.lang.psi.api.toplevel.typedef.{ScClass, ScObject}
 import org.jetbrains.plugins.scala.worksheet.interactive.WorksheetAutoRunner
@@ -39,9 +39,9 @@ class WorksheetIncrementalEditorPrinter(editor: Editor, viewer: Editor, file: Sc
   
   private val inputToOutputMapping = mutable.ListBuffer[(Int, Int)]()
 
-  private def cleanViewerFrom(ln: Int) {
+  private def cleanViewerFrom(ln: Int): Unit = {
     if (ln == 0) {
-      extensions.invokeLater {
+      invokeLater {
         extensions.inWriteAction {
           simpleUpdate("", viewerDocument)
         }
@@ -49,18 +49,16 @@ class WorksheetIncrementalEditorPrinter(editor: Editor, viewer: Editor, file: Sc
       
       return 
     }
-    
-    WriteCommandAction.runWriteCommandAction(project, new Runnable {
-      override def run(): Unit = 
-        viewerDocument.deleteString (
-          viewerDocument.getLineStartOffset(ln), 
-          viewerDocument.getLineEndOffset(viewerDocument.getLineCount - 1)
-        )
-    })
-    
+
+    inWriteCommandAction {
+      viewerDocument.deleteString(
+        viewerDocument.getLineStartOffset(ln),
+        viewerDocument.getLineEndOffset(viewerDocument.getLineCount - 1)
+      )
+    }
   }
-  
-  private def fetchNewPsi() {
+
+  private def fetchNewPsi(): Unit = {
     lastProcessed match {
       case Some(lineNumber) =>
         val i = inputToOutputMapping.lastIndexWhere(_._1 == lineNumber)
@@ -154,36 +152,34 @@ class WorksheetIncrementalEditorPrinter(editor: Editor, viewer: Editor, file: Sc
     val firstOffsetFix = if (lastProcessed.isEmpty) 0 else 1
     lastProcessed = Some(processedStartEndLine)
     WorksheetAutoRunner.getInstance(project).replExecuted(originalDocument, originalTextRange.getEndOffset)
-  
-    extensions.invokeLater {
-      WriteCommandAction.runWriteCommandAction(project, new Runnable {
-        override def run(): Unit = {
-          val oldLinesCount = viewerDocument.getLineCount
 
-          val baseDiff = Math.max(processedStartLine - viewerDocument.getLineCount - 1, 0) + queuedPsi.getBaseDiff
+    invokeLater {
+      inWriteCommandAction {
+        val oldLinesCount = viewerDocument.getLineCount
 
-          val prefix = getNewLines(baseDiff + firstOffsetFix)
-          simpleAppend(prefix, viewerDocument)
-          var addedDiff = 0
-          
-          queuedPsi.getPrintStartOffset(str) foreach {
-            case (absoluteOffset, relativeOffset, outputChunk) => 
-              val df = originalLn(absoluteOffset) - originalLn(absoluteOffset - relativeOffset)
-              addedDiff += df
-              val currentPrefix = getNewLines(df)
-              simpleAppend(currentPrefix + outputChunk, viewerDocument)
-          }
-          
-          inputToOutputMapping.append((processedStartEndLine, linesOutput + baseDiff + addedDiff - 1 + viewerDocument.getLineCount))
-          
-          saveEvaluationResult(viewerDocument.getText)
+        val baseDiff = Math.max(processedStartLine - viewerDocument.getLineCount - 1, 0) + queuedPsi.getBaseDiff
 
-          if (linesOutput > linesInput) {
-            val lineCount = viewerDocument.getLineCount
-            updateFoldings(Seq((oldLinesCount + baseDiff + firstOffsetFix - 1, viewerDocument.getLineEndOffset(lineCount - 1), linesInput, processedEndLine)))
-          }
+        val prefix = getNewLines(baseDiff + firstOffsetFix)
+        simpleAppend(prefix, viewerDocument)
+        var addedDiff = 0
+
+        queuedPsi.getPrintStartOffset(str) foreach {
+          case (absoluteOffset, relativeOffset, outputChunk) =>
+            val df = originalLn(absoluteOffset) - originalLn(absoluteOffset - relativeOffset)
+            addedDiff += df
+            val currentPrefix = getNewLines(df)
+            simpleAppend(currentPrefix + outputChunk, viewerDocument)
         }
-      })
+
+        inputToOutputMapping.append((processedStartEndLine, linesOutput + baseDiff + addedDiff - 1 + viewerDocument.getLineCount))
+
+        saveEvaluationResult(viewerDocument.getText)
+
+        if (linesOutput > linesInput) {
+          val lineCount = viewerDocument.getLineCount
+          updateFoldings(Seq((oldLinesCount + baseDiff + firstOffsetFix - 1, viewerDocument.getLineEndOffset(lineCount - 1), linesInput, processedEndLine)))
+        }
+      }
     }
   }
 

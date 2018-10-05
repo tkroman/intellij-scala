@@ -712,8 +712,14 @@ package object extensions {
 
   implicit def toCallable[T](action: => T): Callable[T] = () => action
 
-  def startCommand(project: Project, runnable: Runnable, commandName: String): Unit =
-    CommandProcessor.getInstance().executeCommand(project, runnable, commandName, null)
+  def startCommand(project: Project, runnable: Runnable,
+                   commandName: String = null): Unit =
+    CommandProcessor.getInstance().executeCommand(
+      project,
+      runnable,
+      commandName,
+      null
+    )
 
   def executeWriteActionCommand(commandName: String = "",
                                 policy: UndoConfirmationPolicy = UndoConfirmationPolicy.DEFAULT)
