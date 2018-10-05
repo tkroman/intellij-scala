@@ -3,8 +3,6 @@ package org.jetbrains.plugins.scala.lang.libraryInjector
 import java.io.{BufferedOutputStream, File, FileOutputStream}
 import java.util.zip.{ZipEntry, ZipOutputStream}
 
-import scala.concurrent.duration.DurationInt
-
 import com.intellij.compiler.CompilerTestUtil
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.projectRoots.Sdk
@@ -16,9 +14,11 @@ import org.jetbrains.plugins.scala.components.libinjection.TestAcknowledgementPr
 import org.jetbrains.plugins.scala.debugger._
 import org.jetbrains.plugins.scala.lang.libraryInjector.LibraryInjectorTest.InjectorLibraryLoader
 import org.jetbrains.plugins.scala.lang.psi.impl.toplevel.typedef.SyntheticMembersInjector
-import org.jetbrains.plugins.scala.util.{CompileServerUtil, ScalaUtil}
+import org.jetbrains.plugins.scala.util.CompileServerUtil
 import org.junit.Assert.assertTrue
 import org.junit.experimental.categories.Category
+
+import scala.concurrent.duration.DurationInt
 
 /**
   * Created by mucianm on 16.03.16.
@@ -57,8 +57,8 @@ class LibraryInjectorTest extends ModuleTestCase with ScalaSdkOwner {
   }
 
   def testSimple() {
-    val injectorLoader = LibraryInjectorLoader.getInstance(getProject)
-    val classes = injectorLoader.getInjectorClasses(classOf[SyntheticMembersInjector])
+    val classes = LibraryInjectorLoader.getInstance(getProject)
+      .getInjectorClasses(classOf[SyntheticMembersInjector])
 
     assertTrue(classes.nonEmpty)
   }
@@ -70,7 +70,7 @@ object LibraryInjectorTest {
     override protected val name: String = "injector"
 
     override protected def path(implicit sdkVersion: ScalaVersion): String = {
-      val tmpDir = ScalaUtil.createTmpDir("injectorTestLib")
+      val tmpDir = LibraryInjectorLoader.createTmpDir("injectorTestLib")
       InjectorLibraryLoader.simpleInjector.zip(tmpDir).getAbsolutePath
     }
   }

@@ -7,7 +7,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import com.intellij.ide.plugins.cl.PluginClassLoader
 import com.intellij.notification._
-import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.{ApplicationManager, PathManager}
 import com.intellij.openapi.components.ProjectComponent
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.module._
@@ -24,7 +24,6 @@ import org.jetbrains.plugins.scala.components.ScalaPluginVersionVerifier.Version
 import org.jetbrains.plugins.scala.debugger.evaluation.EvaluationException
 import org.jetbrains.plugins.scala.project._
 import org.jetbrains.plugins.scala.settings.ScalaProjectSettings
-import org.jetbrains.plugins.scala.util.ScalaUtil
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -328,7 +327,7 @@ class LibraryInjectorLoader(val project: Project) extends ProjectComponent {
 
   // don't forget to remove temp directory after compilation
   private def extractInjectorSources(jar: File, injectorDescriptor: InjectorDescriptor): Seq[File] = {
-    val tmpDir = ScalaUtil.createTmpDir("inject")
+    val tmpDir = createTmpDir("inject")
     def copyToTmpDir(virtualFile: VirtualFile): File = {
       val target = new File(tmpDir, virtualFile.getName)
       val targetStream = new BufferedOutputStream(new FileOutputStream(target))
@@ -479,7 +478,7 @@ class LibraryInjectorLoader(val project: Project) extends ProjectComponent {
 
     val scalaSDK = project.modulesWithScala.head.scalaSdk.get
     val model = project.modifiableModel
-    val module = model.newModule(ScalaUtil.createTmpDir("injectorModule").getAbsolutePath +
+    val module = model.newModule(createTmpDir("injectorModule").getAbsolutePath +
       "/" + INJECTOR_MODULE_NAME, JavaModuleType.getModuleType.getId)
     model.commit()
     module.configureScalaCompilerSettingsFrom("Default", Seq())
@@ -519,8 +518,8 @@ object LibraryInjectorLoader {
   val HELPER_LIBRARY_NAME    = "scala-plugin-dev"
   val INJECTOR_MANIFEST_NAME = "intellij-compat.xml"
   val INJECTOR_MODULE_NAME   = "ijscala-plugin-injector-compile.iml" // TODO: use UUID
-  val myInjectorCacheDir     = new File(ScalaUtil.getScalaPluginSystemPath + "injectorCache/")
-  val myInjectorCacheIndex   = new File(ScalaUtil.getScalaPluginSystemPath + "injectorCache/libs.index")
+  val myInjectorCacheDir = new File(s"${PathManager.getSystemPath}/scala/injectorCache/")
+  val myInjectorCacheIndex = new File(s"${PathManager.getSystemPath}/scala/injectorCache/libs.index")
   implicit val LOG: Logger = Logger.getInstance(getClass)
   private val GROUP = new NotificationGroup("Injector", NotificationDisplayType.STICKY_BALLOON, false)
 
@@ -535,5 +534,12 @@ object LibraryInjectorLoader {
 
   def verifyAndLoadCache: InjectorPersistentCache = {
     verifyLibraryCache(InjectorPersistentCache.loadJarCache)
+  }
+
+  def createTmpDir(prefix: String): File = {
+    val tmpDir = File.createTempFile(prefix, "")
+    tmpDir.delete()
+    tmpDir.mkdir()
+    tmpDir
   }
 }
