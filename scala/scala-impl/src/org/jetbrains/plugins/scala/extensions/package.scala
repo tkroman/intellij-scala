@@ -5,6 +5,7 @@ import java.lang.reflect.InvocationTargetException
 import java.util.concurrent.{Callable, Future}
 import java.util.regex.Pattern
 
+import com.intellij.execution.configurations.SimpleJavaParameters
 import com.intellij.extapi.psi.StubBasedPsiElementBase
 import com.intellij.lang.ASTNode
 import com.intellij.openapi.Disposable
@@ -23,7 +24,8 @@ import com.intellij.psi.stubs.{IStubElementType, StubElement}
 import com.intellij.psi.tree.{IElementType, TokenSet}
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.util.text.CharArrayUtil
-import com.intellij.util.{ArrayFactory, Processor}
+import com.intellij.util.{ArrayFactory, PathUtil, Processor}
+import org.jetbrains.jps.incremental.scala.Client
 import org.jetbrains.plugins.scala.extensions.implementation.iterator._
 import org.jetbrains.plugins.scala.lang.lexer.ScalaTokenTypes
 import org.jetbrains.plugins.scala.lang.psi.ScalaPsiUtil.isInheritorDeep
@@ -630,6 +632,17 @@ package object extensions {
         case member: ScModifierListOwner => member.hasModifierPropertyScala(name)
         case _ => member.hasModifierProperty(name)
       }
+    }
+  }
+
+  implicit class SimpleJavaParametersExt(val parameters: SimpleJavaParameters) extends AnyVal {
+
+    def addRunnersPath(): Unit = {
+      val path = PathUtil.getJarPathForClass(classOf[Client]).replace(
+        "compiler-shared",
+        "runners"
+      )
+      parameters.getClassPath.add(path)
     }
   }
 

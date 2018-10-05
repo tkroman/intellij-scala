@@ -20,10 +20,10 @@ import com.intellij.openapi.util.Key
 import com.intellij.psi.{PsiDocumentManager, PsiFile}
 import javax.swing.Icon
 import org.jetbrains.plugins.scala
+import org.jetbrains.plugins.scala.extensions.SimpleJavaParametersExt
 import org.jetbrains.plugins.scala.lang.psi.api.ScalaFile
 import org.jetbrains.plugins.scala.project._
 import org.jetbrains.plugins.scala.statistics.{FeatureKey, Stats}
-import org.jetbrains.plugins.scala.util.ScalaUtil
 import org.jetbrains.plugins.scala.worksheet.processor.WorksheetCompiler
 import org.jetbrains.plugins.scala.worksheet.runconfiguration.WorksheetCache
 import org.jetbrains.plugins.scala.worksheet.server.WorksheetProcessManager
@@ -146,12 +146,12 @@ object RunWorksheetAction {
 
     params.getClassPath.addAllFiles(files.asJava)
     params.setUseDynamicClasspath(JdkUtil.useDynamicClasspath(project))
-    params.getClassPath.add(ScalaUtil.runnersPath())
+    params.addRunnersPath()
     params.setWorkingDirectory(workingDirectory)
     params.setMainClass(runnerClassName)
     params.configureByModule(module, JavaParameters.JDK_AND_CLASSES_AND_TESTS)
 
-    params.getClassPath.add(ScalaUtil.runnersPath())
+    params.addRunnersPath()
     params.getClassPath.add(additionalCp)
     params.getProgramParametersList addParametersString worksheetField
     if (!consoleArgs.isEmpty) params.getProgramParametersList addParametersString consoleArgs

@@ -9,8 +9,8 @@ import com.intellij.openapi.projectRoots.{JavaSdkType, JdkUtil}
 import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.util.JDOMExternalizer
 import org.jdom.Element
+import org.jetbrains.plugins.scala.extensions.SimpleJavaParametersExt
 import org.jetbrains.plugins.scala.project._
-import org.jetbrains.plugins.scala.util.ScalaUtil
 
 import scala.collection.JavaConverters._
 
@@ -70,7 +70,7 @@ abstract class BaseRunConfiguration(val project: Project, val configurationFacto
 
     params.getClassPath.addAllFiles(files.asJava)
     params.setUseDynamicClasspath(JdkUtil.useDynamicClasspath(getProject))
-    params.getClassPath.add(ScalaUtil.runnersPath())
+    params.addRunnersPath()
     params.setWorkingDirectory(workingDirectory)
     params.setMainClass(mainClass)
     params.configureByModule(module, JavaParameters.JDK_AND_CLASSES_AND_TESTS)

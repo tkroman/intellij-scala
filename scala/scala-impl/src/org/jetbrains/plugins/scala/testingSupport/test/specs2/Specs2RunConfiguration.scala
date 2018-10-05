@@ -4,11 +4,12 @@ package testingSupport.test.specs2
 import com.intellij.execution.configurations._
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiClass
+import com.intellij.util.PathUtil
+import org.jetbrains.jps.incremental.scala.Client
 import org.jetbrains.plugins.scala.lang.psi.api.toplevel.typedef.{ScClass, ScObject}
 import org.jetbrains.plugins.scala.lang.psi.impl.ScPackageImpl
 import org.jetbrains.plugins.scala.testingSupport.test.AbstractTestRunConfiguration.SettingMap
 import org.jetbrains.plugins.scala.testingSupport.test._
-import org.jetbrains.plugins.scala.util.ScalaUtil
 import org.jetbrains.sbt.shell.SbtShellCommunication
 
 import scala.concurrent.Future
@@ -42,10 +43,22 @@ class Specs2RunConfiguration(override val project: Project,
   //TODO temporarily disabled
   override def allowsSbtUiRun: Boolean = false
 
-  override def modifySbtSettingsForUi(comm: SbtShellCommunication): Future[SettingMap] =
-    modifySetting(SettingMap(), "fullClasspath", "test", "Test",
-      "Attributed(new File(\"" + ScalaUtil.runnersPath().replace("\\", "\\\\") + "\"))(AttributeMap.empty)",
-      comm, !_.contains("runners.jar"), shouldRevert = false)
+  override def modifySbtSettingsForUi(communication: SbtShellCommunication): Future[SettingMap] = {
+    val path = PathUtil.getJarPathForClass(classOf[Client])
+      .replace("compiler-shared", "runners")
+      .replace("\\", "\\\\")
+
+    modifySetting(
+      SettingMap(),
+      "fullClasspath",
+      "test",
+      "Test",
+      "Attributed(new File(\"" + path + "\"))(AttributeMap.empty)",
+      communication,
+      !_.contains("runners.jar"),
+      shouldRevert = false
+    )
+  }
 
   override def buildSbtParams(classToTests: Map[String, Set[String]]): Seq[String] = {
     testConfigurationData match {
