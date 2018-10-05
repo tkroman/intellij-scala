@@ -12,7 +12,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages.showErrorDialog
 import com.intellij.psi._
 import com.intellij.util.IncorrectOperationException
-import org.jetbrains.plugins.scala.extensions.{ObjectExt, ToNullSafe, inWriteCommandAction, startCommand}
+import org.jetbrains.plugins.scala.extensions.{ObjectExt, ToNullSafe, executeCommand, inWriteCommandAction}
 import org.jetbrains.plugins.scala.lang.psi.api.ScalaFile
 import org.jetbrains.plugins.scala.project.ModuleExt
 
@@ -51,7 +51,7 @@ class ScalaFilePasteProvider extends PasteProvider {
           .foreach { document =>
             document.setText(fileText)
             documentManager.commitDocument(document)
-            updatePackageStatement(file, directory, project)
+            updatePackageStatement(file, directory)
 
             new OpenFileDescriptor(project, file.getVirtualFile)
               .navigate(true)
@@ -61,17 +61,17 @@ class ScalaFilePasteProvider extends PasteProvider {
       case e: IncorrectOperationException => showErrorDialog(project, e.getMessage, "Paste")
     }
 
-  private def updatePackageStatement(file: ScalaFile, targetDir: PsiDirectory, project: Project) =
-    startCommand(project, new Runnable {
-      def run(): Unit = {
-        Try {
-          JavaDirectoryService.getInstance().nullSafe
-            .map(_.getPackage(targetDir))
-            .map(_.getQualifiedName)
-            .foreach(file.setPackageName)
-        }
+  private def updatePackageStatement(file: ScalaFile, targetDir: PsiDirectory)
+                                    (implicit project: Project): Unit =
+    executeCommand("Updating package statement") {
+      Try {
+        JavaDirectoryService.getInstance().nullSafe
+          .map(_.getPackage(targetDir))
+          .map(_.getQualifiedName)
+          .foreach(file.setPackageName)
       }
-    }, "Updating package statement")
+
+    }
 
   override def isPastePossible(dataContext: DataContext): Boolean = true
 

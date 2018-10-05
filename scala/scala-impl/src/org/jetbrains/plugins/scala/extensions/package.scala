@@ -712,8 +712,9 @@ package object extensions {
 
   implicit def toCallable[T](action: => T): Callable[T] = () => action
 
-  def startCommand(project: Project, runnable: Runnable,
-                   commandName: String = null): Unit =
+  def executeCommand(runnable: Runnable,
+                     commandName: String)
+                    (implicit project: Project): Unit =
     CommandProcessor.getInstance().executeCommand(
       project,
       runnable,
@@ -721,12 +722,16 @@ package object extensions {
       null
     )
 
+  def executeCommand(commandName: String = null)
+                    (body: => Unit)
+                    (implicit project: Project): Unit =
+    executeCommand(() => body, commandName)
+
   def executeWriteActionCommand(commandName: String = "",
                                 policy: UndoConfirmationPolicy = UndoConfirmationPolicy.DEFAULT)
                                (body: => Unit)
                                (implicit project: Project): Unit =
-    startCommand(
-      project,
+    executeCommand(
       () => inWriteAction(body),
       commandName
     )
@@ -735,8 +740,7 @@ package object extensions {
                                 commandName: String,
                                 policy: UndoConfirmationPolicy)
                                (implicit project: Project): Unit =
-    startCommand(
-      project,
+    executeCommand(
       () => WriteCommandAction.runWriteCommandAction(project, runnable),
       commandName
     )

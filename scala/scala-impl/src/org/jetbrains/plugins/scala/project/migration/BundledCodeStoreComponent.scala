@@ -142,7 +142,7 @@ class BundledCodeStoreComponent(project: Project, private val injector: LibraryI
                     case ((_, isSelected), migrator) if isSelected => migrator
                   }
 
-                  new ScalaMigrationRunner(project).runMigrators(chosen.map(_._1).toSeq, service)
+                  new ScalaMigrationRunner()(project).runMigrators(chosen.map(_._1).toSeq, service)
                 }, ())
             case "close" =>
             case _ =>

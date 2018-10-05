@@ -1,13 +1,12 @@
 package org.jetbrains.plugins.scala.worksheet.ui
 
-import com.intellij.openapi.command.CommandProcessor
 import com.intellij.openapi.editor.impl.FoldingModelImpl
 import com.intellij.openapi.editor.{Document, Editor, VisualPosition}
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.psi.PsiDocumentManager
 import org.jetbrains.plugins.scala.extensions
-import org.jetbrains.plugins.scala.extensions.{invokeLater, startCommand}
+import org.jetbrains.plugins.scala.extensions.{executeCommand, invokeLater}
 import org.jetbrains.plugins.scala.settings.ScalaProjectSettings
 import org.jetbrains.plugins.scala.worksheet.ui.WorksheetDiffSplitters.SimpleWorksheetSplitter
 
@@ -65,26 +64,21 @@ abstract class WorksheetEditorPrinterBase(protected val originalEditor: Editor,
     * 
     * @param foldings : (Start output, End output, Input lines count, End input)*
     */
-  protected def updateFoldings(foldings: Seq[(Int, Int, Int, Int)]): Unit = {
-    val runnable: Runnable = () => {
-      val isExpanded = !ScalaProjectSettings.getInstance(project).isWorksheetFoldCollapsedByDefault
+  protected def updateFoldings(foldings: Seq[(Int, Int, Int, Int)]): Unit = executeCommand() {
+    val isExpanded = !ScalaProjectSettings.getInstance(project).isWorksheetFoldCollapsedByDefault
 
-      viewerFolding.runBatchFoldingOperation(() => {
-        foldings foreach {
-          case (start, end, limit, originalEnd) =>
-            val offset = originalDocument getLineEndOffset java.lang.Math.min(originalEnd, originalDocument.getLineCount)
-            val linesCount = viewerDocument.getLineNumber(end) - start - limit + 1
+    viewerFolding.runBatchFoldingOperation(() => {
+      foldings foreach {
+        case (start, end, limit, originalEnd) =>
+          val offset = originalDocument getLineEndOffset java.lang.Math.min(originalEnd, originalDocument.getLineCount)
+          val linesCount = viewerDocument.getLineNumber(end) - start - limit + 1
 
-            group.addRegion(viewerFolding, viewerDocument.getLineStartOffset(start + limit - 1), end,
-              offset, linesCount, limit, isExpanded)
-        }
+          group.addRegion(viewerFolding, viewerDocument.getLineStartOffset(start + limit - 1), end,
+            offset, linesCount, limit, isExpanded)
+      }
 
-        WorksheetFoldGroup.save(getScalaFile, group)
-      }, false)
-    }
-
-    startCommand(project, runnable, null)
-    CommandProcessor.getInstance().executeCommand(project, runnable, null, null)
+      WorksheetFoldGroup.save(getScalaFile, group)
+    }, false)
   }
   
   protected def isInited: Boolean = inited

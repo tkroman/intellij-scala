@@ -3,7 +3,7 @@ package org.jetbrains.plugins.scala.base
 import com.intellij.openapi.actionSystem.IdeActions.{ACTION_EDITOR_BACKSPACE, ACTION_EDITOR_ENTER, ACTION_EXPAND_LIVE_TEMPLATE_BY_TAB}
 import com.intellij.openapi.fileTypes.FileType
 import org.jetbrains.plugins.scala.ScalaFileType
-import org.jetbrains.plugins.scala.extensions.startCommand
+import org.jetbrains.plugins.scala.extensions.executeCommand
 
 /**
   * @author adkozlov
@@ -65,7 +65,7 @@ abstract class EditorActionTestBase extends ScalaLightCodeInsightFixtureTestAdap
     }
 
   private def performEditorAction(action: String): Unit =
-    startCommand(getProject, new Runnable {
-      override def run(): Unit = getFixture.performEditorAction(action)
-    }, "")
+    executeCommand() {
+      getFixture.performEditorAction(action)
+    }(getProject)
 }
