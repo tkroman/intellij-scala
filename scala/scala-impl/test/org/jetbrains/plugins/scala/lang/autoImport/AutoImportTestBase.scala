@@ -4,6 +4,7 @@ package autoImport
 
 import java.io.File
 
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.{CharsetToolkit, LocalFileSystem}
@@ -13,10 +14,10 @@ import com.intellij.testFramework.UsefulTestCase
 import org.jetbrains.plugins.scala.annotator.intention.ScalaImportTypeFix
 import org.jetbrains.plugins.scala.annotator.intention.ScalaImportTypeFix.ClassTypeToImport
 import org.jetbrains.plugins.scala.base.ScalaLightPlatformCodeInsightTestCaseAdapter
+import org.jetbrains.plugins.scala.extensions.executeWriteActionCommand
 import org.jetbrains.plugins.scala.lang.lexer.ScalaTokenTypes
 import org.jetbrains.plugins.scala.lang.psi.api.ScalaFile
 import org.jetbrains.plugins.scala.lang.psi.api.base.ScReferenceElement
-import org.jetbrains.plugins.scala.util.ScalaUtils
 
 /**
  * User: Alexander Podkhalyuzin
@@ -49,26 +50,27 @@ abstract class AutoImportTestBase extends ScalaLightPlatformCodeInsightTestCaseA
       case null =>
       case _ => assert(assertion = false, message = "Reference must be unresolved.")
     }
-    val refPointer = SmartPointerManager.getInstance(getProjectAdapter).createSmartPsiElementPointer(ref)
 
-    val classes = ScalaImportTypeFix.getTypesToImport(ref, getProjectAdapter)
+    implicit val project: Project = getProjectAdapter
+    val refPointer = SmartPointerManager.getInstance(project).createSmartPsiElementPointer(ref)
+
+    val classes = ScalaImportTypeFix.getTypesToImport(ref, project)
     assert(classes.length > 0, "Haven't classes to import")
     var res: String = null
     val lastPsi = scalaFile.findElementAt(scalaFile.getText.length - 1)
     try {
-      ScalaUtils.runWriteAction(new Runnable {
-        def run() {
-          classes(0) match {
-            case ClassTypeToImport(clazz) =>
-              org.jetbrains.plugins.scala.annotator.intention.ScalaImportTypeFix.
-                getImportHolder(ref, getProjectAdapter).addImportForClass(clazz)
-            case ta =>
-              org.jetbrains.plugins.scala.annotator.intention.ScalaImportTypeFix.
-                getImportHolder(ref, getProjectAdapter).addImportForPath(ta.qualifiedName, ref)
-          }
-          UsefulTestCase.doPostponedFormatting(getProjectAdapter)
+      executeWriteActionCommand("Test") {
+        classes(0) match {
+          case ClassTypeToImport(clazz) =>
+            org.jetbrains.plugins.scala.annotator.intention.ScalaImportTypeFix.
+              getImportHolder(ref, project).addImportForClass(clazz)
+          case ta =>
+            org.jetbrains.plugins.scala.annotator.intention.ScalaImportTypeFix.
+              getImportHolder(ref, project).addImportForPath(ta.qualifiedName, ref)
         }
-      }, getProjectAdapter, "Test")
+        UsefulTestCase.doPostponedFormatting(project)
+      }
+
       res = scalaFile.getText.substring(0, lastPsi.getTextOffset).trim//getImportStatements.map(_.getText()).mkString("\n")
       assert(refPointer.getElement.resolve != null, "reference is unresolved after import action")
     }
